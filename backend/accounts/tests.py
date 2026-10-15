@@ -1,4 +1,5 @@
 from django.test import TestCase
+from rest_framework.test import APIClient
 
 from .models import (
     Booking,
@@ -16,6 +17,84 @@ from .models import (
 
 
 class SportsCentreDomainModelsTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_auth_login_returns_token_payload(self):
+        user = User.objects.create_user(
+            username="member1",
+            email="member1@example.com",
+            password="SecurePass123!",
+            first_name="Ada",
+            last_name="Lovelace",
+            category=User.Category.STUDENT,
+            role=User.Role.MEMBER,
+        )
+
+        response = self.client.post(
+            '/api/auth/login/',
+            {'username': 'member1', 'password': 'SecurePass123!'},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('access', response.json())
+        self.assertIn('refresh', response.json())
+        self.assertEqual(response.json()['user']['email'], user.email)
+
+    def test_public_registration_cannot_create_manager_role(self):
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'username': 'newmember',
+                'email': 'newmember@example.com',
+                'password': 'SecurePass123!',
+                'first_name': 'New',
+                'last_name': 'Member',
+                'category': User.Category.STUDENT,
+                'role': User.Role.MANAGER,
+            },
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['role'], User.Role.MEMBER)
+        self.assertNotEqual(response.json()['role'], User.Role.MANAGER)
+
+    def test_manager_admin_can_promote_user_to_manager_role(self):
+        admin = User.objects.create_user(
+            username="adminuser",
+            email="adminuser@example.com",
+            password="SecurePass123!",
+            first_name="Admin",
+            last_name="User",
+            category=User.Category.STAFF,
+            role=User.Role.MANAGER,
+            is_staff=True,
+            is_superuser=True,
+        )
+        member = User.objects.create_user(
+            username="member2",
+            email="member2@example.com",
+            password="SecurePass123!",
+            first_name="Member",
+            last_name="Two",
+            category=User.Category.STUDENT,
+            role=User.Role.MEMBER,
+        )
+
+        self.client.force_authenticate(user=admin)
+        response = self.client.post(
+            '/api/auth/users/role/',
+            {'user_id': member.id, 'role': User.Role.MANAGER},
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        member.refresh_from_db()
+        self.assertEqual(member.role, User.Role.MANAGER)
+        self.assertTrue(member.is_staff)
+
     def test_core_domain_models_can_be_created(self):
         user = User.objects.create_user(
             username="member1",

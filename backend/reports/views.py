@@ -1,13 +1,13 @@
 from django.db.models import Sum
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import Booking, Membership, Payment, Refund, User
+from accounts.permissions import IsManagerOrFinance
 
 
 class OverviewReportView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsManagerOrFinance]
 
     def get(self, request, *args, **kwargs):
         total_members = User.objects.filter(role=User.Role.MEMBER).count()
