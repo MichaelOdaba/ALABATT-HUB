@@ -5,6 +5,7 @@ from .views import (
     EquipmentListCreateView,
     EquipmentLoanDetailView,
     EquipmentLoanListCreateView,
+    EquipmentLoanReturnView,
 )
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path('equipment/<int:pk>/', EquipmentDetailView.as_view(), name='equipment-detail'),
     path('equipment-loans/', EquipmentLoanListCreateView.as_view(), name='equipment-loan-list-create'),
     path('equipment-loans/<int:pk>/', EquipmentLoanDetailView.as_view(), name='equipment-loan-detail'),
+    path('equipment-loans/<int:pk>/return/', EquipmentLoanReturnView.as_view(), name='equipment-loan-return'),
 ]

@@ -17,8 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from accounts.views import AuditLogListView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
     path('api/auth/', include('accounts.urls')),
     path('api/', include('memberships.urls')),
     path('api/', include('bookings.urls')),

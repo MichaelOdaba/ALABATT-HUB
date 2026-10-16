@@ -22,6 +22,10 @@ class IsFinanceOfficer(permissions.BasePermission):
         )
 
 
+class IsFinance(IsFinanceOfficer):
+    pass
+
+
 class IsManagerOrFinance(permissions.BasePermission):
     def has_permission(self, request, view):
         return bool(
@@ -31,12 +35,34 @@ class IsManagerOrFinance(permissions.BasePermission):
         )
 
 
+class IsManagerOrFinanceReadOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.role == User.Role.MANAGER:
+            return True
+        return (
+            request.user.role == User.Role.FINANCE
+            and request.method in permissions.SAFE_METHODS
+        )
+
+
 class IsMemberOrManager(permissions.BasePermission):
     def has_permission(self, request, view):
         return bool(
             request.user
             and request.user.is_authenticated
             and request.user.role in {User.Role.MEMBER, User.Role.MANAGER}
+        )
+
+
+class IsMemberCoachOrManager(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role
+            in {User.Role.MEMBER, User.Role.COACH, User.Role.MANAGER}
         )
 
 

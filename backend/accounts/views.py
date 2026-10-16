@@ -5,8 +5,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import User
-from .serializers import RegisterSerializer, UserSerializer
+from .audit import record_audit_log
+from .models import AuditLog, User
+from .permissions import IsManagerOrFinance
+from .serializers import AuditLogSerializer, RegisterSerializer, UserSerializer
+
+
+class AuditLogListView(generics.ListAPIView):
+    queryset = AuditLog.objects.select_related('user').all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsManagerOrFinance]
 
 
 class RegisterView(generics.CreateAPIView):
@@ -90,9 +98,18 @@ class PromoteUserRoleView(APIView):
             )
 
         user = get_object_or_404(User, pk=user_id)
+        previous_role = user.role
         user.role = requested_role
         if requested_role in {User.Role.MANAGER, User.Role.FINANCE, User.Role.COACH}:
             user.is_staff = True
         user.save(update_fields=['role', 'is_staff'])
+
+        if previous_role != user.role:
+            record_audit_log(
+                user=actor,
+                action='role_changed',
+                entity='user',
+                entity_id=user.pk,
+            )
 
         return Response(UserSerializer(user).data, status=status.HTTP_200_OK)

@@ -13,7 +13,9 @@ from .models import (
     Refund,
     SportsCentre,
     User,
+    AuditLog,
 )
+from payments.services import complete_payment
 
 
 class SportsCentreDomainModelsTests(TestCase):
@@ -94,6 +96,101 @@ class SportsCentreDomainModelsTests(TestCase):
         member.refresh_from_db()
         self.assertEqual(member.role, User.Role.MANAGER)
         self.assertTrue(member.is_staff)
+        self.assertEqual(AuditLog.objects.get().action, 'role_changed')
+
+    def test_role_change_is_recorded_and_audit_logs_are_manager_finance_only(self):
+        manager = User.objects.create_user(
+            username='auditmanager',
+            email='auditmanager@example.com',
+            password='SecurePass123!',
+            role=User.Role.MANAGER,
+        )
+        member = User.objects.create_user(
+            username='auditmember',
+            email='auditmember@example.com',
+            password='SecurePass123!',
+        )
+        self.client.force_authenticate(user=manager)
+
+        promote_response = self.client.post(
+            '/api/auth/users/role/',
+            {'user_id': member.id, 'role': User.Role.COACH},
+            format='json',
+        )
+        audit_response = self.client.get('/api/audit-logs/')
+
+        self.assertEqual(promote_response.status_code, 200)
+        self.assertEqual(audit_response.status_code, 200)
+        self.assertEqual(audit_response.json()[0]['action'], 'role_changed')
+
+        self.client.force_authenticate(user=member)
+        forbidden_response = self.client.get('/api/audit-logs/')
+        self.assertEqual(forbidden_response.status_code, 403)
+
+    def test_payment_refund_and_equipment_return_events_are_audited(self):
+        manager = User.objects.create_user(
+            username='eventmanager',
+            email='eventmanager@example.com',
+            password='SecurePass123!',
+            role=User.Role.MANAGER,
+        )
+        membership_type = MembershipType.objects.create(name='Audit plan')
+        membership = Membership.objects.create(
+            user=manager,
+            membership_type=membership_type,
+            start_date='2026-10-16',
+            status=Membership.Status.PENDING,
+        )
+        payment = Payment.objects.create(
+            user=manager, membership=membership, amount='40.00'
+        )
+        self.client.force_authenticate(user=manager)
+
+        complete_payment(
+            payment.reference,
+            {
+                'reference': payment.reference,
+                'amount': 4000,
+                'status': 'success',
+            },
+        )
+        refund = Refund.objects.create(
+            payment=payment,
+            user=manager,
+            reason='Duplicate charge',
+            amount='10.00',
+        )
+        refund_response = self.client.patch(
+            f'/api/refunds/{refund.id}/',
+            {'status': Refund.Status.APPROVED},
+            format='json',
+        )
+        equipment = Equipment.objects.create(name='Ball', category='sports')
+        equipment.available_quantity = 0
+        equipment.save(update_fields=['available_quantity'])
+        loan = EquipmentLoan.objects.create(
+            user=manager,
+            equipment=equipment,
+            status=EquipmentLoan.Status.ACTIVE,
+            deposit_status=EquipmentLoan.DepositStatus.PAID,
+        )
+        return_response = self.client.post(
+            f'/api/equipment-loans/{loan.id}/return/',
+            {'deposit_status': EquipmentLoan.DepositStatus.RETURNED},
+            format='json',
+        )
+
+        self.assertEqual(refund_response.status_code, 200)
+        self.assertEqual(return_response.status_code, 200)
+        self.assertSetEqual(
+            set(AuditLog.objects.values_list('action', flat=True)),
+            {
+                'payment_confirmed',
+                'membership_approved',
+                'refund_approved',
+                'equipment_returned',
+            },
+        )
 
     def test_core_domain_models_can_be_created(self):
         user = User.objects.create_user(
@@ -163,7 +260,6 @@ class SportsCentreDomainModelsTests(TestCase):
         payment = Payment.objects.create(
             user=user,
             booking=booking,
-            membership=membership,
             amount=15.00,
             payment_method=Payment.PaymentMethod.CARD,
             status=Payment.PaymentStatus.PAID,
