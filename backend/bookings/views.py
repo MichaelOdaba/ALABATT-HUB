@@ -104,3 +104,33 @@ class BookingDecisionView(generics.GenericAPIView):
             entity_id=booking.pk,
         )
         return Response(self.get_serializer(booking).data, status=status.HTTP_200_OK)
+
+
+class BookingCancelView(generics.GenericAPIView):
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
+    permission_classes = [IsMemberCoachOrManager]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.role == 'manager':
+            return queryset
+        return queryset.filter(user=self.request.user)
+
+    def post(self, request, *args, **kwargs):
+        booking = self.get_object()
+        if booking.status != Booking.Status.PENDING:
+            return Response(
+                {'detail': 'Only pending bookings can be cancelled.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        booking.status = Booking.Status.CANCELLED
+        booking.save(update_fields=['status', 'updated_at'])
+        record_audit_log(
+            user=request.user,
+            action='booking_cancelled',
+            entity='booking',
+            entity_id=booking.pk,
+        )
+        return Response(self.get_serializer(booking).data, status=status.HTTP_200_OK)
