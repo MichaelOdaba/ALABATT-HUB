@@ -43,6 +43,9 @@ def amount_to_kobo(amount):
 
 
 def initialize_paystack_transaction(payment):
+    if settings.PAYMENT_SIMULATION:
+        return f'{settings.PAYSTACK_BASE_URL}/simulation/checkout/{payment.reference}'
+
     if not settings.PAYSTACK_SECRET_KEY:
         raise PaystackError('Paystack is not configured. Set PAYSTACK_SECRET_KEY.')
 
@@ -67,6 +70,14 @@ def initialize_paystack_transaction(payment):
 
 
 def verify_paystack_transaction(reference):
+    if settings.PAYMENT_SIMULATION:
+        payment = Payment.objects.get(reference=reference)
+        return {
+            'reference': payment.reference,
+            'amount': amount_to_kobo(payment.amount),
+            'status': 'success',
+        }
+
     if not settings.PAYSTACK_SECRET_KEY:
         raise PaystackError('Paystack is not configured. Set PAYSTACK_SECRET_KEY.')
 

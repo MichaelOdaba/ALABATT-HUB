@@ -107,6 +107,41 @@ class PaystackPaymentTests(TestCase):
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.status, Membership.Status.PENDING)
 
+    @override_settings(PAYMENT_SIMULATION=True, PAYSTACK_SECRET_KEY='')
+    @patch('payments.services.requests.post')
+    def test_simulation_initiates_without_calling_paystack(self, post):
+        response = self.client.post(
+            '/api/payments/initiate/',
+            {'target_type': 'membership', 'target_id': self.membership.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payment = Payment.objects.get()
+        self.assertEqual(
+            response.json()['authorization_url'],
+            f'https://api.paystack.test/simulation/checkout/{payment.reference}',
+        )
+        post.assert_not_called()
+
+    @override_settings(PAYMENT_SIMULATION=True, PAYSTACK_SECRET_KEY='')
+    @patch('payments.services.requests.get')
+    def test_simulation_verification_completes_payment_without_calling_paystack(self, get):
+        payment = Payment.objects.create(
+            user=self.user,
+            membership=self.membership,
+            amount=Decimal('12.34'),
+        )
+
+        response = self.client.get(f'/api/payments/verify/{payment.reference}/')
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        self.membership.refresh_from_db()
+        self.assertEqual(payment.status, Payment.PaymentStatus.PAID)
+        self.assertEqual(self.membership.status, Membership.Status.ACTIVE)
+        get.assert_not_called()
+
     @patch('payments.services.requests.post')
     def test_booking_initiation_includes_server_calculated_event_fee(self, post):
         post.return_value = self.paystack_response(

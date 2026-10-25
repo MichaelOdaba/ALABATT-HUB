@@ -55,7 +55,7 @@ class PaymentInitiateView(APIView):
     permission_classes = [IsMemberCoachOrManager]
 
     def post(self, request, *args, **kwargs):
-        if not settings.PAYSTACK_SECRET_KEY:
+        if not settings.PAYMENT_SIMULATION and not settings.PAYSTACK_SECRET_KEY:
             return Response(
                 {'detail': 'Paystack is not configured. Set PAYSTACK_SECRET_KEY.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -41,6 +41,7 @@ CSRF_TRUSTED_ORIGINS = [
 
 PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY', '')
 PAYSTACK_BASE_URL = os.getenv('PAYSTACK_BASE_URL', 'https://api.paystack.co').rstrip('/')
+PAYMENT_SIMULATION = os.getenv('PAYMENT_SIMULATION', '').strip().lower() == 'true'
 
 
 # Application definition
