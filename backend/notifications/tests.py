@@ -53,3 +53,28 @@ class NotificationPermissionTests(TestCase):
         self.assertTrue(self.notification.is_read)
         self.assertEqual(self.notification.message, 'Your booking is pending.')
         self.assertEqual(create_response.status_code, 403)
+
+    def test_coach_sees_own_notifications_and_can_mark_read(self):
+        coach = User.objects.create_user(
+            username='coach',
+            email='coach@example.com',
+            password='SecurePass123!',
+            role=User.Role.COACH,
+        )
+        coach_notification = Notification.objects.create(
+            user=coach,
+            title='Training update',
+            message='Your training session has changed.',
+        )
+        self.client.force_authenticate(user=coach)
+
+        list_response = self.client.get('/api/notifications/')
+        update_response = self.client.patch(
+            f'/api/notifications/{coach_notification.id}/',
+            {'is_read': True},
+            format='json',
+        )
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual([item['id'] for item in list_response.json()], [coach_notification.id])
+        self.assertEqual(update_response.status_code, 200)

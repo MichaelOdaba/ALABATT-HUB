@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions
 
 from accounts.models import Notification, User
-from accounts.permissions import IsManager, IsMemberOrManager
+from accounts.permissions import IsManager, IsMemberCoachOrManager
 from .serializers import NotificationSerializer
 
 
@@ -17,7 +17,7 @@ class NotificationListCreateView(generics.ListCreateAPIView):
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
-            return [IsMemberOrManager()]
+            return [IsMemberCoachOrManager()]
         return [IsManager()]
 
 
@@ -33,7 +33,7 @@ class NotificationDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         if self.request.method in permissions.SAFE_METHODS:
-            return [IsMemberOrManager()]
+            return [IsMemberCoachOrManager()]
         if self.request.method == 'PATCH':
-            return [IsMemberOrManager()]
+            return [IsMemberCoachOrManager()]
         return [IsManager()]
